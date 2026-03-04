@@ -1,0 +1,182 @@
+# Lesson 7: Volumes & Mounts
+
+## We've Been Using These Since Lesson 2
+
+Look at our `devcontainer.json`:
+
+```json
+"mounts": [
+  "source=devcontainers-extensions,target=/root/.vscode-server/extensions,type=volume",
+  "source=claude-config,target=/root/.claude,type=volume"
+]
+```
+
+These are **named volumes** — and they're the reason your VS Code extensions and Claude config survive container rebuilds. Time to understand what's actually going on.
+
+## The Workspace Mount (The Invisible One)
+
+Your project files are already mounted into the container. You didn't configure this — dev containers do it automatically:
+
+```
+Your host: /path/to/learn-dev-containers/
+                    ↕ (bind mount)
+Container:  /workspaces/learn-dev-containers/
+```
+
+When you edit a file in VS Code, it changes on both sides instantly. Your files live on the host; the container just has a window into them. This is why your code isn't lost when a container is rebuilt — it was never inside the container to begin with.
+
+You can customize this with `"workspaceMount"` and `"workspaceFolder"`, but the defaults work for almost everyone.
+
+## Two Types of Mounts
+
+### Named Volumes
+
+```json
+"source=devcontainers-extensions,target=/root/.vscode-server/extensions,type=volume"
+```
+
+- **Docker manages the storage.** You don't pick a folder on your host — Docker puts it somewhere internal.
+- **Survives container rebuilds.** The volume exists independently of any container.
+- **You reference it by name** (`devcontainers-extensions`). Any container can mount a volume by name.
+- **Best for:** caches, tool state, databases — anything the container generates that you want to keep, but don't need to browse on your host.
+
+### Bind Mounts
+
+```json
+"source=/home/you/.ssh,target=/root/.ssh,type=bind"
+```
+
+- **You pick the host folder.** It maps a specific directory on your machine into the container.
+- **Two-way sync.** Changes on either side are immediately visible to the other.
+- **Best for:** sharing host files with the container — SSH keys, git config, credentials.
+
+## The Mount String Format
+
+Each mount is a comma-separated string of key=value pairs:
+
+```
+source=<name-or-path>,target=<container-path>,type=<volume|bind>[,readonly]
+```
+
+| Key | Named Volume | Bind Mount |
+|---|---|---|
+| `source` | A name (Docker picks the location) | An absolute path on your host |
+| `target` | Path inside the container | Path inside the container |
+| `type` | `volume` | `bind` |
+| `readonly` | Optional — makes it read-only | Optional — makes it read-only |
+
+## What We're Already Mounting (And Why)
+
+```json
+"mounts": [
+  "source=devcontainers-extensions,target=/root/.vscode-server/extensions,type=volume",
+  "source=claude-config,target=/root/.claude,type=volume"
+]
+```
+
+**`devcontainers-extensions`** — VS Code installs extensions into `/root/.vscode-server/extensions` inside the container. Without this volume, every Rebuild Container would re-download and re-install all extensions. The named volume persists them across rebuilds.
+
+**`claude-config`** — Claude Code stores session data and config in `/root/.claude`. The volume keeps this across rebuilds so you don't lose your Claude setup.
+
+## Common Mount Patterns
+
+### SSH Keys (Bind Mount)
+
+Share your host's SSH keys so `git push` works inside the container:
+
+```json
+"mounts": [
+  "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,readonly"
+]
+```
+
+`${localEnv:HOME}` expands to your host home directory. The `readonly` flag prevents the container from modifying your keys.
+
+### pip Cache (Named Volume)
+
+Speed up `pip install` across rebuilds by caching downloaded packages:
+
+```json
+"mounts": [
+  "source=pip-cache,target=/root/.cache/pip,type=volume"
+]
+```
+
+First rebuild: `pip install` downloads everything. Second rebuild: packages are already cached in the volume.
+
+### Git Config (Bind Mount)
+
+Share your host's git identity so commits inside the container have the right author:
+
+```json
+"mounts": [
+  "source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,readonly"
+]
+```
+
+## Managing Volumes
+
+Named volumes are managed by Docker. Useful commands:
+
+```bash
+docker volume ls                        # list all volumes
+docker volume inspect <name>            # show details (including where Docker stores it)
+docker volume rm <name>                 # delete a volume
+docker volume prune                     # delete all unused volumes
+```
+
+Volumes stick around even after containers are deleted. That's the point — but it also means they can accumulate. `docker volume prune` cleans up orphans.
+
+## Named Volume vs Bind Mount — When to Use Which
+
+| Use a named volume when... | Use a bind mount when... |
+|---|---|
+| You want data to survive rebuilds | You need to share host files with the container |
+| Docker can manage the storage location | You need a specific host path |
+| The data is generated by the container | The data originates on the host |
+| You don't need to browse the files on the host | You want the files visible on both sides |
+
+## Our Config (No Changes This Lesson)
+
+We already have the mounts we need. No changes to `devcontainer.json` — this lesson explains what we set up back in Lesson 2:
+
+```json
+{
+  "name": "Learn Dev Containers",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "pip install -r requirements.txt",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "Web App",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["anthropic.claude-code"],
+      "settings": {
+        "editor.formatOnSave": true,
+        "files.trimTrailingWhitespace": true
+      }
+    }
+  },
+  "mounts": [
+    "source=devcontainers-extensions,target=/root/.vscode-server/extensions,type=volume",
+    "source=claude-config,target=/root/.claude,type=volume"
+  ]
+}
+```
+
+## Key Takeaways
+
+- Your project files are automatically bind-mounted into the container — that's why code survives rebuilds
+- Named volumes let Docker manage persistent storage (caches, tool state, databases)
+- Bind mounts share specific host directories with the container (SSH keys, git config)
+- Our extension and Claude volumes from Lesson 2 are why rebuilds don't lose all your setup
+- Volumes exist independently of containers — they persist until you explicitly delete them
