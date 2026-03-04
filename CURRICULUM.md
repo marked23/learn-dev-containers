@@ -126,3 +126,17 @@ A progressive guide from zero to proficient with dev containers.
 - Using dev containers in CI/CD (e.g., GitHub Actions with `devcontainers/ci`)
 
 **Why it matters**: The CLI decouples dev containers from VS Code, making them useful for CI pipelines, other editors, and automated workflows.
+
+---
+
+## Lesson 10: Multiple Container Configurations
+
+**Concept**: A single repository can have multiple dev container configurations, each in a named subdirectory under `.devcontainer/`. This lets you target different hardware, runtimes, or toolchains from the same codebase.
+
+**What you'll learn**:
+- Why you'd want multiple configs (different GPUs, languages, OS variants)
+- The named subdirectory structure (`.devcontainer/<name>/devcontainer.json`)
+- The two-step VS Code workflow for switching between containers
+- Practical tips: distinct volume names, shared setup scripts, clear container naming
+
+**Why it matters**: Real projects often need to run across different environments. Multiple configs let each team member (or each machine) use the right container without maintaining separate branches or repos.

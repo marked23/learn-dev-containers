@@ -1,7 +1,16 @@
 {
-  "name": "Learn Dev Containers",
+  "name": "Learn Dev Containers (ROCm)",
   "build": {
     "dockerfile": "Dockerfile"
+  },
+  "runArgs": [
+    "--device=/dev/kfd",
+    "--device=/dev/dri",
+    "--group-add=video",
+    "--security-opt=seccomp=unconfined"
+  ],
+  "containerEnv": {
+    "HSA_OVERRIDE_GFX_VERSION": "11.0.0"
   },
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {}
